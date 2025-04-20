@@ -7,22 +7,31 @@
 
 #pragma once
 
-typedef int (*hellow_callback_function)(int socket, char *method, char *url, void *user_data);
+typedef void (*hellow_callback_function)(int socket, char *method, char *url, void *user_data);
+
+typedef struct
+{
+    char *url;
+    hellow_callback_function callback;
+    void *user_data;
+} hellow_route;
 
 typedef struct hellow_ctx
 {
     uint16_t port;
     int server_fd;
     struct sockaddr_in address;
-    hellow_callback_function callback_function;
-    void *callback_user_data;
     pthread_t accept_thread_id;
     int accept_stop_flag;
+    hellow_route *routes;
+    size_t route_count;
 } hellow_ctx;
 
 void hellow_stop(hellow_ctx *context);
 
-hellow_ctx *hellow_init(uint16_t port, hellow_callback_function callback_function, void *callback_user_data);
+hellow_ctx *hellow_init(uint16_t port);
+
+int hellow_add_route(hellow_ctx *context, char *url, hellow_callback_function callback, void *user_data);
 
 int hellow_send_response(int socket, unsigned int status_code, char *content_type, char *body);
 

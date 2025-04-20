@@ -3,45 +3,49 @@
 
 #define PORT 8080
 
-static int my_callback(int socket, char *method, char *url, void *user_data)
+static void home_callback(int socket, char *method, char *url, void *user_data)
 {
     (void)user_data;
 
-    if (strcmp(method, "GET") != 0)
-    {
-        return 0;
-    }
+    hellow_send_response(socket, 200, "text/html",
+                         "<html><body>"
+                         "<h1>Milou Club</h1>"
+                         "<p>Milou, known as Snowy in English, is Tintin's brave and loyal fox terrier. He's clever, curious, and always ready for adventure-especially if there's a bone involved.</p>"
+                         "</body></html>");
+}
 
-    if (strcmp(url, "/") == 0)
-    {
-        hellow_send_response(socket, 200, "text/html",
-                             "<html><body>"
-                             "<h1>Welcome to the Milou Fan Club</h1>"
-                             "<p>Milou, known as Snowy in English, is Tintin's brave and loyal fox terrier. He's clever, curious, and always ready for adventure-especially if there's a bone involved.</p>"
-                             "</body></html>");
-    }
-    else if (strcmp(url, "/about") == 0 || strcmp(url, "/about/") == 0)
-    {
-        hellow_send_response(socket, 200, "text/html", "<html><body><h1>About Page</h1></body></html>");
-    }
-    else
-    {
-        hellow_send_response(socket, 404, "text/html", "<html><body><h1>404 Not Found</h1></body></html>");
-    }
+static void about_callback(int socket, char *method, char *url, void *user_data)
+{
+    (void)user_data;
 
-    return 1;
+    hellow_send_response(socket, 200, "text/html",
+                         "<html><body>"
+                         "<h1>Milou Clud</h1>"
+                         "<h2>About Page</h2>"
+                         "<p>This website is hosted by Isak Jacobsson</p>"
+                         "</body></html>");
 }
 
 int main(void)
 {
-    hellow_ctx *context = hellow_init(PORT, my_callback, NULL);
+    hellow_ctx *context = hellow_init(PORT);
+
+    hellow_add_route(context, "/", home_callback, NULL);
+    hellow_add_route(context, "/about", about_callback, NULL);
+
+    printf("%s\n", context->routes[0].url);
+    printf("%s\n", context->routes[1].url);
 
     hellow_start_server(context);
+
+    printf("Server running on http://localhost:%d\n", context->port);
 
     printf("Press the ENTER key to stop server: ");
     (void)getchar();
 
     hellow_stop(context);
+
+    printf("Server stopped\n");
 
     return 0;
 }

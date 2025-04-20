@@ -4,26 +4,30 @@
 
 void hellow_stop(hellow_ctx *context)
 {
-    context->accept_stop_flag = 1;
-
     if (context->server_fd >= 0)
     {
         close(context->server_fd);
     }
 
+    // Stop accept thread
+    context->accept_stop_flag = 1;
     pthread_join(context->accept_thread_id, NULL);
 
-    free(context);
+    // Free urls for routes
+    for (size_t i = 0; i < context->route_count; i++)
+    {
+        free(context->routes[i].url);
+    }
 
-    printf("Server stopped\n");
+    free(context->routes);
+
+    free(context);
 }
 
-hellow_ctx *hellow_init(uint16_t port, hellow_callback_function callback_function, void *callback_user_data)
+hellow_ctx *hellow_init(uint16_t port)
 {
-    hellow_ctx *context = (hellow_ctx *)malloc(sizeof(hellow_ctx));
+    hellow_ctx *context = (hellow_ctx *)calloc(1, sizeof(hellow_ctx));
     context->port = port;
-    context->callback_function = callback_function;
-    context->callback_user_data = callback_user_data;
 
     // Create socket
     context->server_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -44,6 +48,24 @@ hellow_ctx *hellow_init(uint16_t port, hellow_callback_function callback_functio
     }
 
     return context;
+}
+
+int hellow_add_route(hellow_ctx *context, char *url, hellow_callback_function callback, void *user_data)
+{
+    if (!context || !url || !callback)
+        return 0;
+
+    hellow_route *new_routes = realloc(context->routes, sizeof(hellow_route) * (context->route_count + 1));
+    if (!new_routes)
+        return 0;
+
+    context->routes = new_routes;
+    context->routes[context->route_count].url = strdup(url);
+    context->routes[context->route_count].callback = callback;
+    context->routes[context->route_count].user_data = user_data;
+    context->route_count++;
+
+    return 1;
 }
 
 int hellow_send_response(int socket, unsigned int status_code, char *content_type, char *body)
@@ -89,7 +111,21 @@ static void handle_request(hellow_ctx *context, int client_socket)
     char method[8], url[1024];
     sscanf(buffer, "%s %1023s", method, url);
 
-    int res = context->callback_function(client_socket, method, url, context->callback_user_data);
+    // Call the correct callback
+    int found_route = 0;
+    for (int i = 0; i < context->route_count; i++)
+    {
+        if (strcmp(url, context->routes[i].url) == 0)
+        {
+            context->routes[i].callback(client_socket,
+                                        method, context->routes[i].url,
+                                        context->routes[i].user_data);
+        }
+    }
+    if (!found_route)
+    {
+        hellow_send_response(client_socket, 404, "text/html", "<html><body><h1>404 Not Found</h1></body></html>");
+    }
 
     close(client_socket);
 }
@@ -122,8 +158,6 @@ void hellow_start_server(hellow_ctx *context)
     {
         hellow_stop(context);
     }
-
-    printf("Server running on http://localhost:%d\n", context->port);
 
     pthread_t thread_id;
     if (pthread_create(&thread_id, NULL, accept_thread, (void *)context) != 0)
