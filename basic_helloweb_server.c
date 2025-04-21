@@ -1,5 +1,7 @@
-#include <string.h>
 #include "helloweb.h"
+
+#include <string.h>
+#include <stdio.h>
 
 #define PORT 8080
 
@@ -35,7 +37,7 @@ int main(void)
 
     hellow_start_server(context);
 
-    printf("Server running on http://localhost:%d\n", context->port);
+    printf("Server running on http://localhost:%d\n", PORT);
 
     printf("Press the ENTER key to stop server: ");
     (void)getchar();

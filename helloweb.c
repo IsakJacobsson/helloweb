@@ -1,7 +1,35 @@
 #include "helloweb.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <pthread.h>
+#include <fcntl.h>
+#include <sys/epoll.h>
+#include <errno.h>
+
 #define BUFFER_SIZE 4096
 #define MAX_EVENTS 10
+
+typedef struct
+{
+    char *url;
+    hellow_callback_function callback;
+    void *user_data;
+} hellow_route;
+
+struct hellow_ctx
+{
+    uint16_t port;
+    int server_fd;
+    struct sockaddr_in address;
+    pthread_t accept_thread_id;
+    int accept_stop_flag;
+    hellow_route *routes;
+    size_t route_count;
+};
 
 void hellow_stop(hellow_ctx *context)
 {
