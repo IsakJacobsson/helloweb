@@ -1,23 +1,26 @@
 #include "helloweb.h"
 
 #define BUFFER_SIZE 4096
+#define MAX_EVENTS 10
 
 void hellow_stop(hellow_ctx *context)
 {
+    if (!context)
+        return;
+
+    context->accept_stop_flag = 1;
+
     if (context->server_fd >= 0)
     {
         close(context->server_fd);
+        context->server_fd = -1;
     }
 
-    // Stop accept thread
-    context->accept_stop_flag = 1;
     pthread_join(context->accept_thread_id, NULL);
 
     // Free urls for routes
     for (size_t i = 0; i < context->route_count; i++)
-    {
         free(context->routes[i].url);
-    }
 
     free(context->routes);
 
@@ -32,6 +35,13 @@ hellow_ctx *hellow_init(uint16_t port)
     // Create socket
     context->server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (context->server_fd == 0)
+    {
+        hellow_stop(context);
+        return NULL;
+    }
+
+    int opt = 1;
+    if (setsockopt(context->server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
     {
         hellow_stop(context);
         return NULL;
@@ -61,6 +71,9 @@ int hellow_add_route(hellow_ctx *context, char *url, hellow_callback_function ca
 
     context->routes = new_routes;
     context->routes[context->route_count].url = strdup(url);
+    if (!context->routes[context->route_count].url)
+        return 0;
+
     context->routes[context->route_count].callback = callback;
     context->routes[context->route_count].user_data = user_data;
     context->route_count++;
@@ -126,45 +139,73 @@ static void handle_request(hellow_ctx *context, int client_socket)
     {
         hellow_send_response(client_socket, 404, "text/html", "<html><body><h1>404 Not Found</h1></body></html>");
     }
-
-    close(client_socket);
 }
 
 static void *accept_thread(void *arg)
 {
     hellow_ctx *context = (hellow_ctx *)arg;
 
+    int epoll_fd = epoll_create1(0);
+    struct epoll_event ev = {
+        .events = EPOLLIN,
+        .data.fd = context->server_fd};
+    epoll_ctl(epoll_fd, EPOLL_CTL_ADD, context->server_fd, &ev);
+
+    struct epoll_event events[MAX_EVENTS];
+
     int addrlen = sizeof(context->address);
     while (!context->accept_stop_flag)
     {
-        int client_socket = accept(context->server_fd, (struct sockaddr *)&context->address, (socklen_t *)&addrlen);
-        if (client_socket < 0)
+        int n = epoll_wait(epoll_fd, events, MAX_EVENTS, 1000);
+        for (int i = 0; i < n; ++i)
         {
-            if (context->accept_stop_flag)
-                break;
-            hellow_stop(context);
-            return NULL;
+            if (events[i].data.fd == context->server_fd)
+            {
+                // Accept new connection
+                struct sockaddr_in client_addr;
+                socklen_t client_len = sizeof(client_addr);
+                int client_fd = accept(context->server_fd, (struct sockaddr *)&client_addr, &client_len);
+                if (client_fd < 0)
+                {
+                    if (errno == EINTR || errno == EAGAIN)
+                        continue; // harmless, retry
+                    if (context->accept_stop_flag)
+                        break;
+                    continue;
+                }
+                struct epoll_event client_ev = {
+                    .events = EPOLLIN | EPOLLET,
+                    .data.fd = client_fd};
+                epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &client_ev);
+            }
+            else
+            {
+                // Read from client
+                handle_request(context, events[i].data.fd);
+                close(events[i].data.fd);
+            }
         }
-
-        handle_request(context, client_socket);
     }
 
+    close(epoll_fd);
     return NULL;
 }
 
-void hellow_start_server(hellow_ctx *context)
+int hellow_start_server(hellow_ctx *context)
 {
     if (listen(context->server_fd, 3) < 0)
     {
         hellow_stop(context);
+        return 0;
     }
 
     pthread_t thread_id;
     if (pthread_create(&thread_id, NULL, accept_thread, (void *)context) != 0)
     {
         hellow_stop(context);
-        return;
+        return 0;
     }
 
     context->accept_thread_id = thread_id;
+    return 1;
 }

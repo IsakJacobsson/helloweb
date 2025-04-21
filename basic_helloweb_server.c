@@ -33,9 +33,6 @@ int main(void)
     hellow_add_route(context, "/", home_callback, NULL);
     hellow_add_route(context, "/about", about_callback, NULL);
 
-    printf("%s\n", context->routes[0].url);
-    printf("%s\n", context->routes[1].url);
-
     hellow_start_server(context);
 
     printf("Server running on http://localhost:%d\n", context->port);

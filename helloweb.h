@@ -4,6 +4,9 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <fcntl.h>
+#include <sys/epoll.h>
+#include <errno.h>
 
 #pragma once
 
@@ -35,4 +38,4 @@ int hellow_add_route(hellow_ctx *context, char *url, hellow_callback_function ca
 
 int hellow_send_response(int socket, unsigned int status_code, char *content_type, char *body);
 
-void hellow_start_server(hellow_ctx *context);
+int hellow_start_server(hellow_ctx *context);
