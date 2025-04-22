@@ -3,9 +3,31 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef void (*hellow_callback_function)(int socket, char* method, char* url, void* user_data);
-
 typedef struct hellow_ctx hellow_ctx;
+
+typedef struct {
+    const char* method;
+    const char* path;
+    const char* query_string;
+    const char* headers;
+    const char* body;
+} hellow_request;
+
+typedef struct {
+    int status_code;
+    char* content_type;
+    char* body;
+    size_t body_length;
+} hellow_response;
+
+typedef struct {
+    int client_fd;
+    hellow_request* request;
+    hellow_response* response;
+    int manual_response;
+} hellow_response_context;
+
+typedef void (*hellow_callback_function)(hellow_response_context* response_ctx, void* user_data);
 
 void hellow_stop(hellow_ctx* context);
 
@@ -15,7 +37,5 @@ int hellow_add_route(hellow_ctx* context,
                      char* url,
                      hellow_callback_function callback,
                      void* user_data);
-
-int hellow_send_response(int socket, unsigned int status_code, char* content_type, char* body);
 
 int hellow_start_server(hellow_ctx* context);

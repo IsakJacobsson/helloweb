@@ -14,7 +14,7 @@
 #define MAX_EVENTS  10
 
 typedef struct {
-    char* url;
+    char* path;
     hellow_callback_function callback;
     void* user_data;
 } hellow_route;
@@ -42,8 +42,8 @@ void hellow_stop(hellow_ctx* context) {
 
     pthread_join(context->accept_thread_id, NULL);
 
-    // Free urls for routes
-    for (size_t i = 0; i < context->route_count; i++) free(context->routes[i].url);
+    // Free paths for routes
+    for (size_t i = 0; i < context->route_count; i++) free(context->routes[i].path);
 
     free(context->routes);
 
@@ -81,10 +81,10 @@ hellow_ctx* hellow_init(uint16_t port) {
 }
 
 int hellow_add_route(hellow_ctx* context,
-                     char* url,
+                     char* path,
                      hellow_callback_function callback,
                      void* user_data) {
-    if (!context || !url || !callback)
+    if (!context || !path || !callback)
         return 0;
 
     hellow_route* new_routes =
@@ -92,9 +92,9 @@ int hellow_add_route(hellow_ctx* context,
     if (!new_routes)
         return 0;
 
-    context->routes                           = new_routes;
-    context->routes[context->route_count].url = strdup(url);
-    if (!context->routes[context->route_count].url)
+    context->routes                            = new_routes;
+    context->routes[context->route_count].path = strdup(path);
+    if (!context->routes[context->route_count].path)
         return 0;
 
     context->routes[context->route_count].callback  = callback;
@@ -104,23 +104,25 @@ int hellow_add_route(hellow_ctx* context,
     return 1;
 }
 
-int hellow_send_response(int socket, unsigned int status_code, char* content_type, char* body) {
+static int hellow_send_response(hellow_response* response, int client_fd) {
     char header[BUFFER_SIZE];
-    const char* status_text;
+    char* status_text;
 
-    switch (status_code) {
+    switch (response->status_code) {
         case 200:
             status_text = "OK";
             break;
         case 404:
             status_text = "Not Found";
             break;
+        case 500:
+            status_text = "Internal Server Error";
+            break;
         default:
             status_text = "OK";
             break;
     }
 
-    int body_len = strlen(body);
     snprintf(header,
              BUFFER_SIZE,
              "HTTP/1.1 %d %s\r\n"
@@ -128,50 +130,76 @@ int hellow_send_response(int socket, unsigned int status_code, char* content_typ
              "Content-Length: %d\r\n"
              "\r\n"
              "%s",
-             status_code,
+             response->status_code,
              status_text,
-             content_type,
-             body_len,
-             body);
+             response->content_type,
+             response->body_length,
+             response->body);
 
-    write(socket, header, strlen(header));
+    write(client_fd, header, strlen(header));
 
     return 1;
 }
 
-static void handle_request(hellow_ctx* context, int client_socket) {
+static void handle_request(hellow_ctx* context, int client_fd) {
     char buffer[BUFFER_SIZE];
     memset(buffer, 0, BUFFER_SIZE);
 
-    read(client_socket, buffer, BUFFER_SIZE - 1);
+    read(client_fd, buffer, BUFFER_SIZE - 1);
 
-    // Extract the path from the request
-    char method[8], url[1024];
-    sscanf(buffer, "%s %1023s", method, url);
+    // Extract the method and path from the request
+    char method[8] = {0}, path[1024] = {0};
+    sscanf(buffer, "%s %1023s", method, path);
+
+    hellow_request request = {.method       = method,
+                              .path         = path,
+                              .query_string = NULL,
+                              .headers      = NULL,
+                              .body         = NULL};
+
+    hellow_response response = {.status_code  = 0,
+                                .content_type = NULL,
+                                .body         = NULL,
+                                .body_length  = 0};
+
+    hellow_response_context response_context = {.client_fd       = client_fd,
+                                                .request         = &request,
+                                                .response        = &response,
+                                                .manual_response = 0};
 
     // Call the correct callback
     int found_route = 0;
     for (int i = 0; i < context->route_count; i++) {
-        if (strcmp(url, context->routes[i].url) == 0) {
-            context->routes[i].callback(client_socket,
-                                        method,
-                                        context->routes[i].url,
-                                        context->routes[i].user_data);
+        if (strcmp(path, context->routes[i].path) == 0) {
+            found_route = 1;
+            context->routes[i].callback(&response_context, context->routes[i].user_data);
+            break;
         }
     }
+
+    if (response_context.manual_response)
+        return;
+
     if (!found_route) {
-        hellow_send_response(client_socket,
-                             404,
-                             "text/html",
-                             "<html><body><h1>404 Not Found</h1></body></html>");
+        char body_404[] = "<html><body><h1>404 Not Found</h1></body></html>";
+
+        response_context.response->status_code  = 404;
+        response_context.response->content_type = strdup("text/html");
+        response_context.response->body         = strdup(body_404);
+        response_context.response->body_length  = strlen(body_404);
     }
+
+    hellow_send_response(response_context.response, client_fd);
+
+    free(response_context.response->content_type);
+    free(response_context.response->body);
 }
 
 static void* accept_thread(void* arg) {
     hellow_ctx* context = (hellow_ctx*)arg;
 
     int epoll_fd          = epoll_create1(0);
-    struct epoll_event ev = {.events = EPOLLIN, .data.fd = context->server_fd};
+    struct epoll_event ev = {.events = EPOLLIN | EPOLLET, .data.fd = context->server_fd};
     epoll_ctl(epoll_fd, EPOLL_CTL_ADD, context->server_fd, &ev);
 
     struct epoll_event events[MAX_EVENTS];

@@ -5,31 +5,41 @@
 
 #define PORT 8080
 
-static void home_callback(int socket, char* method, char* url, void* user_data) {
+static void home_callback(hellow_response_context* response_ctx, void* user_data) {
     (void)user_data;
 
-    hellow_send_response(
-        socket,
-        200,
-        "text/html",
+    char body[] =
         "<html><body>"
         "<h1>Milou Club</h1>"
         "<p>Milou, known as Snowy in English, is Tintin's brave and loyal fox terrier. He's "
         "clever, curious, and always ready for adventure-especially if there's a bone involved.</p>"
-        "</body></html>");
+        "</body></html>";
+
+    response_ctx->response->status_code  = 200;
+    response_ctx->response->content_type = strdup("text/html");
+    response_ctx->response->body         = strdup(body);
+    if (!response_ctx->response->body) {
+        return;
+    }
+    response_ctx->response->body_length = strlen(body);
 }
 
-static void about_callback(int socket, char* method, char* url, void* user_data) {
+static void about_callback(hellow_response_context* response_ctx, void* user_data) {
     (void)user_data;
 
-    hellow_send_response(socket,
-                         200,
-                         "text/html",
-                         "<html><body>"
-                         "<h1>Milou Clud</h1>"
-                         "<h2>About Page</h2>"
-                         "<p>This website is hosted by Isak Jacobsson</p>"
-                         "</body></html>");
+    char body[] =
+        "<h1>Milou Clud</h1>"
+        "<h2>About Page</h2>"
+        "<p>This website is hosted by Isak Jacobsson</p>"
+        "</body></html>";
+
+    response_ctx->response->status_code  = 200;
+    response_ctx->response->content_type = strdup("text/html");
+    response_ctx->response->body         = strdup(body);
+    if (!response_ctx->response->body) {
+        return;
+    }
+    response_ctx->response->body_length = strlen(body);
 }
 
 int main(void) {
