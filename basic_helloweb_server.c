@@ -1,9 +1,22 @@
 #include "helloweb.h"
 
+#include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define PORT 8080
+
+hellow_ctx* context = NULL;
+
+// Signal handler for SIGINT (Ctrl+C)
+static void signal_handler(int signal) {
+    if (context != NULL) {
+        printf("\nCaught signal %d, stopping server...\n", signal);
+        hellow_stop(context);
+    }
+    exit(0);  // Exit after cleaning up
+}
 
 static void home_callback(hellow_response_context* response_ctx, void* user_data) {
     (void)user_data;
@@ -43,10 +56,12 @@ static void about_callback(hellow_response_context* response_ctx, void* user_dat
 }
 
 int main(void) {
-    hellow_ctx* context = hellow_init(PORT);
+    context = hellow_init(PORT);
 
     hellow_add_route(context, "/", home_callback, NULL);
     hellow_add_route(context, "/about", about_callback, NULL);
+
+    signal(SIGINT, signal_handler);
 
     hellow_start_server(context);
 

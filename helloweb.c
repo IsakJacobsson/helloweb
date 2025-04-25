@@ -61,6 +61,10 @@ hellow_ctx* hellow_init(uint16_t port) {
         return NULL;
     }
 
+    // Set to socket to non blocking
+    int flags = fcntl(context->server_fd, F_GETFL, 0);
+    fcntl(context->server_fd, F_SETFL, flags | O_NONBLOCK);
+
     int opt = 1;
     if (setsockopt(context->server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
         hellow_stop(context);
@@ -145,14 +149,16 @@ static void handle_request(hellow_ctx* context, int client_fd) {
     char buffer[BUFFER_SIZE];
     memset(buffer, 0, BUFFER_SIZE);
 
-    read(client_fd, buffer, BUFFER_SIZE - 1);
+    if (read(client_fd, buffer, BUFFER_SIZE - 1) <= 0) {
+        return;
+    }
 
     // Extract the method and path from the request
     char method[8] = {0}, path[1024] = {0};
-    sscanf(buffer, "%s %1023s", method, path);
+    sscanf(buffer, "%7s %1023s", method, path);
 
-    hellow_request request = {.method       = method,
-                              .path         = path,
+    hellow_request request = {.method       = strdup(method),
+                              .path         = strdup(path),
                               .query_string = NULL,
                               .headers      = NULL,
                               .body         = NULL};
@@ -178,7 +184,7 @@ static void handle_request(hellow_ctx* context, int client_fd) {
     }
 
     if (response_context.manual_response)
-        return;
+        goto cleanup;
 
     if (!found_route) {
         char body_404[] = "<html><body><h1>404 Not Found</h1></body></html>";
@@ -188,9 +194,27 @@ static void handle_request(hellow_ctx* context, int client_fd) {
         response_context.response->body         = strdup(body_404);
         response_context.response->body_length  = strlen(body_404);
     }
+    // Check if response is incomplete, return a 500 if so
+    else if (response_context.response->content_type == NULL ||
+             response_context.response->body == NULL ||
+             response_context.response->status_code == 0) {
+        char body_500[] = "<html><body><h1>500 Internal Server Error</h1></body></html>";
+
+        // Free memory allocated by the callback
+        free(response_context.response->content_type);
+        free(response_context.response->body);
+
+        response_context.response->status_code  = 500;
+        response_context.response->content_type = strdup("text/html");
+        response_context.response->body         = strdup(body_500);
+        response_context.response->body_length  = strlen(body_500);
+    }
 
     hellow_send_response(response_context.response, client_fd);
 
+cleanup:
+    free(request.method);
+    free(request.path);
     free(response_context.response->content_type);
     free(response_context.response->body);
 }
@@ -199,7 +223,7 @@ static void* accept_thread(void* arg) {
     hellow_ctx* context = (hellow_ctx*)arg;
 
     int epoll_fd          = epoll_create1(0);
-    struct epoll_event ev = {.events = EPOLLIN | EPOLLET, .data.fd = context->server_fd};
+    struct epoll_event ev = {.events = EPOLLIN, .data.fd = context->server_fd};
     epoll_ctl(epoll_fd, EPOLL_CTL_ADD, context->server_fd, &ev);
 
     struct epoll_event events[MAX_EVENTS];
@@ -208,21 +232,13 @@ static void* accept_thread(void* arg) {
     while (!context->accept_stop_flag) {
         int n = epoll_wait(epoll_fd, events, MAX_EVENTS, 1000);
         for (int i = 0; i < n; ++i) {
-            if (events[i].data.fd == context->server_fd) {
-                // Accept new connection
-                struct sockaddr_in client_addr;
-                socklen_t client_len = sizeof(client_addr);
-                int client_fd =
-                    accept(context->server_fd, (struct sockaddr*)&client_addr, &client_len);
-                if (client_fd < 0) {
-                    if (errno == EINTR || errno == EAGAIN)
-                        continue;  // harmless, retry
-                    if (context->accept_stop_flag)
-                        break;
-                    continue;
-                }
+            int fd = events[i].data.fd;
+            if (fd == context->server_fd) {
+                // Accept the connection
+                int client_fd                = accept(context->server_fd, NULL, NULL);
                 struct epoll_event client_ev = {.events = EPOLLIN | EPOLLET, .data.fd = client_fd};
                 epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &client_ev);
+
             } else {
                 // Read from client
                 handle_request(context, events[i].data.fd);
@@ -236,7 +252,7 @@ static void* accept_thread(void* arg) {
 }
 
 int hellow_start_server(hellow_ctx* context) {
-    if (listen(context->server_fd, 3) < 0) {
+    if (listen(context->server_fd, SOMAXCONN) < 0) {
         hellow_stop(context);
         return 0;
     }

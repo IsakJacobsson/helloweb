@@ -6,11 +6,11 @@
 typedef struct hellow_ctx hellow_ctx;
 
 typedef struct {
-    const char* method;
-    const char* path;
-    const char* query_string;
-    const char* headers;
-    const char* body;
+    char* method;
+    char* path;
+    char* query_string;
+    char* headers;
+    char* body;
 } hellow_request;
 
 typedef struct {
