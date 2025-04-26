@@ -127,20 +127,22 @@ static int hellow_send_response(hellow_response* response, int client_fd) {
             break;
     }
 
-    snprintf(header,
-             BUFFER_SIZE,
-             "HTTP/1.1 %d %s\r\n"
-             "Content-Type: %s\r\n"
-             "Content-Length: %d\r\n"
-             "\r\n"
-             "%s",
-             response->status_code,
-             status_text,
-             response->content_type,
-             response->body_length,
-             response->body);
+    int header_length = snprintf(header,
+                                 BUFFER_SIZE,
+                                 "HTTP/1.1 %d %s\r\n"
+                                 "Content-Type: %s\r\n"
+                                 "Content-Length: %d\r\n"
+                                 "\r\n",
+                                 response->status_code,
+                                 status_text,
+                                 response->content_type,
+                                 response->body_length);
 
-    write(client_fd, header, strlen(header));
+    // Send the header first
+    write(client_fd, header, header_length);
+
+    // Then send the body separately
+    write(client_fd, response->body, response->body_length);
 
     return 1;
 }

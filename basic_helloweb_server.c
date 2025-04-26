@@ -9,6 +9,11 @@
 
 hellow_ctx* context = NULL;
 
+typedef struct {
+    char* filename;
+    char* content_type;
+} callback_data;
+
 // Signal handler for SIGINT (Ctrl+C)
 static void signal_handler(int signal) {
     if (context != NULL) {
@@ -18,48 +23,59 @@ static void signal_handler(int signal) {
     exit(0);  // Exit after cleaning up
 }
 
-static void home_callback(hellow_response_context* response_ctx, void* user_data) {
-    (void)user_data;
+static void file_callback(hellow_response_context* response_ctx, void* user_data) {
+    callback_data* file_info = (callback_data*)user_data;
 
-    char body[] =
-        "<html><body>"
-        "<h1>Milou Club</h1>"
-        "<p>Milou, known as Snowy in English, is Tintin's brave and loyal fox terrier. He's "
-        "clever, curious, and always ready for adventure-especially if there's a bone involved.</p>"
-        "</body></html>";
+    FILE* f = fopen(file_info->filename, "rb");
+    if (!f)
+        return;
 
-    response_ctx->response->status_code  = 200;
-    response_ctx->response->content_type = strdup("text/html");
-    response_ctx->response->body         = strdup(body);
-    if (!response_ctx->response->body) {
+    fseek(f, 0, SEEK_END);
+    size_t file_size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    unsigned char* file_data = malloc(file_size);
+    if (!file_data) {
+        fclose(f);
         return;
     }
-    response_ctx->response->body_length = strlen(body);
-}
 
-static void about_callback(hellow_response_context* response_ctx, void* user_data) {
-    (void)user_data;
-
-    char body[] =
-        "<h1>Milou Clud</h1>"
-        "<h2>About Page</h2>"
-        "<p>This website is hosted by Isak Jacobsson</p>"
-        "</body></html>";
+    fread(file_data, 1, file_size, f);
+    fclose(f);
 
     response_ctx->response->status_code  = 200;
-    response_ctx->response->content_type = strdup("text/html");
-    response_ctx->response->body         = strdup(body);
-    if (!response_ctx->response->body) {
-        return;
-    }
-    response_ctx->response->body_length = strlen(body);
+    response_ctx->response->content_type = strdup(file_info->content_type);
+
+    // Important: Copy the image into response->body
+    response_ctx->response->body = malloc(file_size);
+    memcpy(response_ctx->response->body, file_data, file_size);
+    response_ctx->response->body_length = file_size;
+
+    free(file_data);
 }
 
 int main(void) {
     context = hellow_init(PORT);
 
-    hellow_add_route(context, "/", home_callback, NULL);
-    hellow_add_route(context, "/about", about_callback, NULL);
+    callback_data index_html_info = {.filename     = "./website/index.html",
+                                     .content_type = "text/html"};
+    callback_data milou1_info     = {.filename     = "./website/images/milou1.jpeg",
+                                     .content_type = "image/jpeg"};
+    callback_data milou2_info     = {.filename     = "./website/images/milou2.png",
+                                     .content_type = "image/png"};
+    callback_data milou3_info     = {.filename     = "./website/images/milou3.png",
+                                     .content_type = "image/png"};
+    callback_data milou4_info     = {.filename     = "./website/images/milou4.jpg",
+                                     .content_type = "image/jpg"};
+    callback_data milou5_info     = {.filename     = "./website/images/milou5.jpg",
+                                     .content_type = "image/jpg"};
+
+    hellow_add_route(context, "/", file_callback, &index_html_info);
+    hellow_add_route(context, "/milou1", file_callback, &milou1_info);
+    hellow_add_route(context, "/milou2", file_callback, &milou2_info);
+    hellow_add_route(context, "/milou3", file_callback, &milou3_info);
+    hellow_add_route(context, "/milou4", file_callback, &milou4_info);
+    hellow_add_route(context, "/milou5", file_callback, &milou5_info);
 
     signal(SIGINT, signal_handler);
 
