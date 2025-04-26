@@ -34,7 +34,7 @@ void hellow_stop(hellow_ctx* context);
 hellow_ctx* hellow_init(uint16_t port);
 
 int hellow_add_route(hellow_ctx* context,
-                     char* url,
+                     char* path,
                      hellow_callback_function callback,
                      void* user_data);
 
