@@ -25,6 +25,7 @@ struct hellow_ctx {
     struct sockaddr_in address;
     pthread_t accept_thread_id;
     int accept_stop_flag;
+    char* default_root;
     hellow_route* routes;
     size_t route_count;
 };
@@ -45,14 +46,17 @@ void hellow_stop(hellow_ctx* context) {
     // Free paths for routes
     for (size_t i = 0; i < context->route_count; i++) free(context->routes[i].path);
 
+    free(context->default_root);
+
     free(context->routes);
 
     free(context);
 }
 
 hellow_ctx* hellow_init(uint16_t port) {
-    hellow_ctx* context = (hellow_ctx*)calloc(1, sizeof(hellow_ctx));
-    context->port       = port;
+    hellow_ctx* context   = (hellow_ctx*)calloc(1, sizeof(hellow_ctx));
+    context->port         = port;
+    context->default_root = NULL;
 
     // Create socket
     context->server_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -147,6 +151,74 @@ static int hellow_send_response(hellow_response* response, int client_fd) {
     return 1;
 }
 
+static char* get_mime_type(const char* file_path) {
+    const char* ext = strrchr(file_path, '.');
+    if (!ext)
+        return "application/octet-stream";  // default
+
+    if (strcmp(ext, ".html") == 0)
+        return "text/html";
+    if (strcmp(ext, ".css") == 0)
+        return "text/css";
+    if (strcmp(ext, ".js") == 0)
+        return "application/javascript";
+    if (strcmp(ext, ".png") == 0)
+        return "image/png";
+    if (strcmp(ext, ".jpg") == 0 || strcmp(ext, ".jpeg") == 0)
+        return "image/jpeg";
+    // Add more as needed...
+
+    return "application/octet-stream";
+}
+
+static int serve_default_root(hellow_ctx* context, hellow_response_context* response_context) {
+    char file_path[2048];
+    snprintf(file_path,
+             sizeof(file_path),
+             "%s%s",
+             context->default_root,
+             response_context->request->path);
+
+    // Prevent path traversal
+    if (strstr(file_path, "..")) {
+        return 0;
+    }
+
+    FILE* f = fopen(file_path, "rb");
+    if (!f)
+        return 0;
+
+    fseek(f, 0, SEEK_END);
+    size_t file_size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    unsigned char* file_data = malloc(file_size);
+    if (!file_data) {
+        fclose(f);
+        return 0;
+    }
+
+    size_t bytes_read = fread(file_data, 1, file_size, f);
+    if (bytes_read != file_size) {
+        free(file_data);
+        fclose(f);
+        return 0;
+    }
+    fclose(f);
+
+    response_context->response->status_code  = 200;
+    response_context->response->content_type = strdup(get_mime_type(file_path));
+
+    // Important: Copy the image into response->body
+    response_context->response->body = malloc(file_size);
+    memcpy(response_context->response->body, file_data, file_size);
+    response_context->response->body_length = file_size;
+
+    free(file_data);
+
+    return 1;
+}
+
 static void handle_request(hellow_ctx* context, int client_fd) {
     char buffer[BUFFER_SIZE];
     memset(buffer, 0, BUFFER_SIZE);
@@ -187,6 +259,12 @@ static void handle_request(hellow_ctx* context, int client_fd) {
 
     if (response_context.manual_response)
         goto cleanup;
+
+    if (!found_route && context->default_root) {
+        if (serve_default_root(context, &response_context)) {
+            found_route = 1;
+        }
+    }
 
     if (!found_route) {
         char body_404[] = "<html><body><h1>404 Not Found</h1></body></html>";
@@ -267,4 +345,10 @@ int hellow_start_server(hellow_ctx* context) {
 
     context->accept_thread_id = thread_id;
     return 1;
+}
+
+void hellow_set_default_root(hellow_ctx* context, const char* root) {
+    if (context->default_root)
+        free(context->default_root);
+    context->default_root = strdup(root);
 }

@@ -39,3 +39,5 @@ int hellow_add_route(hellow_ctx* context,
                      void* user_data);
 
 int hellow_start_server(hellow_ctx* context);
+
+void hellow_set_default_root(hellow_ctx* context, const char* default_root);
