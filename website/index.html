@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Milou Club</title>
+    <style>
+        body {
+            background-color: #f0f8ff;
+            font-family: 'Arial', sans-serif;
+            color: #333;
+            text-align: center;
+            padding: 50px;
+        }
+
+        h1 {
+            font-size: 3em;
+            color: #4B9CD3;
+            margin-bottom: 20px;
+        }
+
+        img {
+            width: auto;
+            height: 250px;
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            margin-bottom: 20px;
+        }
+
+        p {
+            font-size: 1.2em;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 1em;
+            background-color: #4B9CD3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        button:hover {
+            background-color: #3a7fa0;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Milou Club</h1>
+    <img id="milouImage" src="" alt="Milou">
+    <p>
+        Milou is Tintin's brave and loyal fox terrier. He's
+        clever, curious, and always ready for adventure—especially if there's a bone
+        involved.
+    </p>
+
+    <!-- Button to trigger the JavaScript -->
+    <button onclick="randomize_milou_pic()">Click for Milou's Adventure!</button>
+
+    <script>
+        // JavaScript function to change background color and show an alert
+        let currentSrcIdx = 2;
+        let imageSrcs = ["/images/milou1.jpeg", "/images/milou2.png", "/images/milou3.png", "/images/milou4.jpg", "/images/milou5.jpg"]; // Dynamically setting the image source
+
+        randomize_milou_pic();
+
+        // JavaScript function to toggle background color
+        function randomize_milou_pic() {
+            let nextSrcIdx = Math.floor(Math.random() * imageSrcs.length)
+            // Force that next is not the same as current
+            while (nextSrcIdx === currentSrcIdx) {
+                nextSrcIdx = Math.floor(Math.random() * imageSrcs.length)
+            }
+            document.getElementById('milouImage').src = imageSrcs[nextSrcIdx];
+            currentSrcIdx = nextSrcIdx;
+        }
+    </script>
+</body>
+
+</html>
