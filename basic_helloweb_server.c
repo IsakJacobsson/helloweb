@@ -29,6 +29,7 @@ int main(void) {
     hellow_set_default_root(context, "./website");
 
     signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
 
     hellow_start_server(context);
 
