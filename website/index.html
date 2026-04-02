@@ -48,6 +48,12 @@
         button:hover {
             background-color: #3a7fa0;
         }
+
+        #apiMessage {
+            margin-top: 20px;
+            font-size: 1.3em;
+            color: #2a6f9e;
+        }
     </style>
 </head>
 
@@ -63,23 +69,46 @@
     <!-- Button to trigger the JavaScript -->
     <button onclick="randomize_milou_pic()">Click for Milou's Adventure!</button>
 
-    <script>
-        // JavaScript function to change background color and show an alert
-        let currentSrcIdx = 2;
-        let imageSrcs = ["/images/milou1.jpeg", "/images/milou2.png", "/images/milou3.png", "/images/milou4.jpg", "/images/milou5.jpg"]; // Dynamically setting the image source
+    <!-- Placeholder for API message -->
+    <div id="apiMessage">Loading greeting...</div>
 
+    <!-- Placeholder for API request count -->
+    <div id="apiCounter">Loading request count...</div>
+
+    <script>
+        // Image randomization logic
+        let currentSrcIdx = 2;
+        let imageSrcs = ["/images/milou1.jpeg", "/images/milou2.png", "/images/milou3.png", "/images/milou4.jpg", "/images/milou5.jpg"];
         randomize_milou_pic();
 
-        // JavaScript function to toggle background color
         function randomize_milou_pic() {
-            let nextSrcIdx = Math.floor(Math.random() * imageSrcs.length)
-            // Force that next is not the same as current
+            let nextSrcIdx = Math.floor(Math.random() * imageSrcs.length);
             while (nextSrcIdx === currentSrcIdx) {
-                nextSrcIdx = Math.floor(Math.random() * imageSrcs.length)
+                nextSrcIdx = Math.floor(Math.random() * imageSrcs.length);
             }
             document.getElementById('milouImage').src = imageSrcs[nextSrcIdx];
             currentSrcIdx = nextSrcIdx;
         }
+
+        // Fetch API greeting from /api/hello
+        async function fetchGreeting() {
+            try {
+                const response = await fetch('/api/hello');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                document.getElementById('apiMessage').textContent = data.message;
+                document.getElementById('apiCounter').textContent = `API Request Count: ${data.requestCount}`;
+            } catch (error) {
+                console.error('Error fetching greeting:', error);
+                document.getElementById('apiMessage').textContent = 'Failed to load greeting.';
+                document.getElementById('apiCounter').textContent = 'Failed to load request count.';
+            }
+        }
+
+        // Call the API when page loads
+        fetchGreeting();
     </script>
 </body>
 

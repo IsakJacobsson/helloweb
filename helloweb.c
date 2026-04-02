@@ -135,7 +135,7 @@ static int hellow_send_response(hellow_response* response, int client_fd) {
                                  BUFFER_SIZE,
                                  "HTTP/1.1 %d %s\r\n"
                                  "Content-Type: %s\r\n"
-                                 "Content-Length: %d\r\n"
+                                 "Content-Length: %zu\r\n"
                                  "\r\n",
                                  response->status_code,
                                  status_text,
@@ -249,7 +249,7 @@ static void handle_request(hellow_ctx* context, int client_fd) {
 
     // Call the correct callback
     int found_route = 0;
-    for (int i = 0; i < context->route_count; i++) {
+    for (size_t i = 0; i < context->route_count; i++) {
         if (strcmp(path, context->routes[i].path) == 0) {
             found_route = 1;
             context->routes[i].callback(&response_context, context->routes[i].user_data);
@@ -308,7 +308,6 @@ static void* accept_thread(void* arg) {
 
     struct epoll_event events[MAX_EVENTS];
 
-    int addrlen = sizeof(context->address);
     while (!context->accept_stop_flag) {
         int n = epoll_wait(epoll_fd, events, MAX_EVENTS, 1000);
         for (int i = 0; i < n; ++i) {
