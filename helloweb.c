@@ -171,14 +171,8 @@ static char* get_mime_type(const char* file_path) {
     return "application/octet-stream";
 }
 
-static int serve_default_root(hellow_ctx* context, hellow_response_context* response_context) {
-    char file_path[2048];
-    snprintf(file_path,
-             sizeof(file_path),
-             "%s%s",
-             context->default_root,
-             response_context->request->path);
-
+static int try_serve_file(const char* file_path,
+                         hellow_response_context* response_context) {
     // Prevent path traversal
     if (strstr(file_path, "..")) {
         return 0;
@@ -199,24 +193,55 @@ static int serve_default_root(hellow_ctx* context, hellow_response_context* resp
     }
 
     size_t bytes_read = fread(file_data, 1, file_size, f);
+    fclose(f);
+
     if (bytes_read != file_size) {
         free(file_data);
-        fclose(f);
         return 0;
     }
-    fclose(f);
 
     response_context->response->status_code  = 200;
     response_context->response->content_type = strdup(get_mime_type(file_path));
 
-    // Important: Copy the image into response->body
     response_context->response->body = malloc(file_size);
     memcpy(response_context->response->body, file_data, file_size);
     response_context->response->body_length = file_size;
 
     free(file_data);
-
     return 1;
+}
+
+static int serve_default_root(hellow_ctx* context,
+                             hellow_response_context* response_context) {
+    char file_path[2048];
+    const char* req_path = response_context->request->path;
+
+    // 1. Try exact path
+    snprintf(file_path, sizeof(file_path), "%s%s",
+             context->default_root, req_path);
+
+    if (try_serve_file(file_path, response_context)) {
+        return 1;
+    }
+
+    // 2. Try adding /index.html
+    char index_path[2048];
+
+    if (req_path[strlen(req_path) - 1] == '/') {
+        // "/about/" -> "/about/index.html"
+        snprintf(index_path, sizeof(index_path), "%s%sindex.html",
+                 context->default_root, req_path);
+    } else {
+        // "/about" -> "/about/index.html"
+        snprintf(index_path, sizeof(index_path), "%s%s/index.html",
+                 context->default_root, req_path);
+    }
+
+    if (try_serve_file(index_path, response_context)) {
+        return 1;
+    }
+
+    return 0;
 }
 
 static void handle_request(hellow_ctx* context, int client_fd) {
