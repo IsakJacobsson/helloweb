@@ -211,37 +211,30 @@ static int try_serve_file(const char* file_path,
     return 1;
 }
 
-static int serve_default_root(hellow_ctx* context,
-                             hellow_response_context* response_context) {
+static int serve_default_root(hellow_ctx* context, hellow_response_context* response_context) {
     char file_path[2048];
     const char* req_path = response_context->request->path;
 
-    // 1. Try exact path
-    snprintf(file_path, sizeof(file_path), "%s%s",
-             context->default_root, req_path);
-
+    // 1. Try exact file
+    snprintf(file_path, sizeof(file_path), "%s%s", context->default_root, req_path);
     if (try_serve_file(file_path, response_context)) {
         return 1;
     }
 
     // 2. Try adding /index.html
     char index_path[2048];
-
     if (req_path[strlen(req_path) - 1] == '/') {
-        // "/about/" -> "/about/index.html"
-        snprintf(index_path, sizeof(index_path), "%s%sindex.html",
-                 context->default_root, req_path);
+        snprintf(index_path, sizeof(index_path), "%s%sindex.html", context->default_root, req_path);
     } else {
-        // "/about" -> "/about/index.html"
-        snprintf(index_path, sizeof(index_path), "%s%s/index.html",
-                 context->default_root, req_path);
+        snprintf(index_path, sizeof(index_path), "%s%s/index.html", context->default_root, req_path);
     }
-
     if (try_serve_file(index_path, response_context)) {
         return 1;
     }
 
-    return 0;
+    // 3. Fallback for SPA: serve root index.html
+    snprintf(file_path, sizeof(file_path), "%s/index.html", context->default_root);
+    return try_serve_file(file_path, response_context);
 }
 
 static void handle_request(hellow_ctx* context, int client_fd) {
