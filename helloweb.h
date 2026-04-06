@@ -29,15 +29,15 @@ typedef struct {
 
 typedef void (*hellow_callback_function)(hellow_response_context* response_ctx, void* user_data);
 
-void hellow_stop(hellow_ctx* context);
-
 hellow_ctx* hellow_init(uint16_t port);
+
+void hellow_set_default_root(hellow_ctx* context, const char* default_root);
 
 int hellow_add_route(hellow_ctx* context,
                      char* path,
                      hellow_callback_function callback,
                      void* user_data);
 
-int hellow_start_server(hellow_ctx* context);
+int hellow_start(hellow_ctx* context);
 
-void hellow_set_default_root(hellow_ctx* context, const char* default_root);
+void hellow_stop(hellow_ctx* context);

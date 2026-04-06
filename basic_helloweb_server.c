@@ -69,7 +69,7 @@ int main(void) {
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
-    hellow_start_server(context);
+    hellow_start(context);
 
     printf("Server running on http://localhost:%d\n", PORT);
 

@@ -400,7 +400,7 @@ static void* accept_thread(void* arg) {
     return NULL;
 }
 
-int hellow_start_server(hellow_ctx* context) {
+int hellow_start(hellow_ctx* context) {
     if (listen(context->server_fd, SOMAXCONN) < 0) {
         hellow_stop(context);
         return 0;
