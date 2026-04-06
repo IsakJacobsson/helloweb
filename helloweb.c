@@ -30,6 +30,13 @@ struct hellow_ctx {
     size_t route_count;
 };
 
+typedef struct {
+    int fd;
+    char buffer[BUFFER_SIZE];
+    size_t buffer_len;
+    int header_complete;
+} client_conn;
+
 void hellow_stop(hellow_ctx* context) {
     if (!context)
         return;
@@ -237,17 +244,34 @@ static int serve_default_root(hellow_ctx* context, hellow_response_context* resp
     return try_serve_file(file_path, response_context);
 }
 
-static void handle_request(hellow_ctx* context, int client_fd) {
-    char buffer[BUFFER_SIZE];
-    memset(buffer, 0, BUFFER_SIZE);
+static int read_into_buffer(client_conn* conn) {
+    while (1) {
+        ssize_t n = read(conn->fd,
+                         conn->buffer + conn->buffer_len,
+                         BUFFER_SIZE - conn->buffer_len - 1);
 
-    if (read(client_fd, buffer, BUFFER_SIZE - 1) <= 0) {
-        return;
+        if (n > 0) {
+            conn->buffer_len += n;
+            conn->buffer[conn->buffer_len] = '\0';
+
+            if (strstr(conn->buffer, "\r\n\r\n")) {
+                conn->header_complete = 1;
+                return 1; // header complete
+            }
+        }
+        else if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            return 0; // need more data
+        }
+        else {
+            return -1; // error / disconnect
+        }
     }
+}
 
+static void handle_request(hellow_ctx* context, client_conn* conn) {
     // Extract the method and path from the request
     char method[8] = {0}, path[1024] = {0};
-    sscanf(buffer, "%7s %1023s", method, path);
+    sscanf(conn->buffer, "%7s %1023s", method, path);
 
     hellow_request request = {.method       = strdup(method),
                               .path         = strdup(path),
@@ -260,7 +284,7 @@ static void handle_request(hellow_ctx* context, int client_fd) {
                                 .body         = NULL,
                                 .body_length  = 0};
 
-    hellow_response_context response_context = {.client_fd       = client_fd,
+    hellow_response_context response_context = {.client_fd       = conn->fd,
                                                 .request         = &request,
                                                 .response        = &response,
                                                 .manual_response = 0};
@@ -308,7 +332,7 @@ static void handle_request(hellow_ctx* context, int client_fd) {
         response_context.response->body_length  = strlen(body_500);
     }
 
-    hellow_send_response(response_context.response, client_fd);
+    hellow_send_response(response_context.response, conn->fd);
 
 cleanup:
     free(request.method);
@@ -332,14 +356,42 @@ static void* accept_thread(void* arg) {
             int fd = events[i].data.fd;
             if (fd == context->server_fd) {
                 // Accept the connection
-                int client_fd                = accept(context->server_fd, NULL, NULL);
-                struct epoll_event client_ev = {.events = EPOLLIN | EPOLLET, .data.fd = client_fd};
-                epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &client_ev);
+                int client_fd = accept(context->server_fd, NULL, NULL);
 
+                // make client non-blocking
+                int flags = fcntl(client_fd, F_GETFL, 0);
+                fcntl(client_fd, F_SETFL, flags | O_NONBLOCK);
+
+                client_conn* conn = calloc(1, sizeof(client_conn));
+                conn->fd = client_fd;
+
+                struct epoll_event client_ev = {
+                    .events = EPOLLIN | EPOLLET,
+                    .data.ptr = conn
+                };
+
+                epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &client_ev);
             } else {
                 // Read from client
-                handle_request(context, events[i].data.fd);
-                close(events[i].data.fd);
+                client_conn* conn = (client_conn*)events[i].data.ptr;
+
+                int read_result = read_into_buffer(conn);
+
+                if (read_result == -1) {
+                    close(conn->fd);
+                    free(conn);
+                    continue;
+                }
+
+                if (!conn->header_complete) {
+                    continue;
+                }
+
+                handle_request(context, conn);
+
+                // close
+                close(conn->fd);
+                free(conn);
             }
         }
     }
