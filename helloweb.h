@@ -41,7 +41,18 @@ typedef void (*hellow_callback_function)(hellow_response_context* response_ctx, 
  * @param port The port number on which the server will listen for incoming connections.
  * @return A pointer to the initialized server context, or NULL on failure.
  */
-hellow_ctx* hellow_init(uint16_t port);
+hellow_ctx* hellow_init_tcp(uint16_t port);
+
+/**
+ * Initializes the Helloweb server on on a Unix domain socket.
+ *
+ * @param socket_path The filesystem path of the Unix socket on which the server will listen.
+ *                    If a file already exists at this path, it will be removed.
+ * @return A pointer to the initialized server context, or NULL on failure.
+ *
+ * @note After stopping the server with hellow_stop(), the socket file will be automatically removed.
+ */
+hellow_ctx* hellow_init_unix(const char* socket_path);
 
 /**
  * Sets the default root directory for serving static files.

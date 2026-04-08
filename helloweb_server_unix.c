@@ -6,7 +6,7 @@
 #include <string.h>
 #include <time.h>
 
-#define PORT 8080
+#define UNIX_SOCKET_PATH "/tmp/hellow.sock"
 
 hellow_ctx* context = NULL;
 
@@ -54,13 +54,19 @@ void api_example_callback(hellow_response_context* response_ctx, void* user_data
 }
 
 int main(void) {
-    context = hellow_init(PORT);
+    // Initialize the server on a Unix socket
+    context = hellow_init_unix(UNIX_SOCKET_PATH);
+    if (!context) {
+        fprintf(stderr, "Failed to initialize server on %s\n", UNIX_SOCKET_PATH);
+        return EXIT_FAILURE;
+    }
 
     hellow_set_default_root(context, "./react/dist");
 
     example_data* data = malloc(sizeof(example_data));
     if (!data) {
         fprintf(stderr, "Failed to allocate memory for example_data\n");
+        hellow_stop(context);
         return EXIT_FAILURE;
     }
     data->request_count = 0;
@@ -69,9 +75,13 @@ int main(void) {
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
-    hellow_start(context);
+    if (!hellow_start(context)) {
+        fprintf(stderr, "Failed to start server\n");
+        hellow_stop(context);
+        return EXIT_FAILURE;
+    }
 
-    printf("Server running on http://localhost:%d\n", PORT);
+    printf("Server running on Unix socket: %s\n", UNIX_SOCKET_PATH);
 
     printf("Press the ENTER key to stop server: ");
     (void)getchar();

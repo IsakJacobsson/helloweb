@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/epoll.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 #define BUFFER_SIZE 4096
@@ -19,10 +20,15 @@ typedef struct {
     void* user_data;
 } hellow_route;
 
+typedef enum { HELLOW_TYPE_TCP, HELLOW_TYPE_UNIX } hellow_socket_type;
+
 struct hellow_ctx {
-    uint16_t port;
+    hellow_socket_type type;     // TCP or Unix socket
+    uint16_t port;               // Only used for TCP
+    char* unix_path;             // Only used for Unix socket
     int server_fd;
     struct sockaddr_in address;
+    struct sockaddr_un unix_address;
     pthread_t accept_thread_id;
     int accept_stop_flag;
     char* default_root;
@@ -38,8 +44,7 @@ typedef struct {
 } client_conn;
 
 void hellow_stop(hellow_ctx* context) {
-    if (!context)
-        return;
+    if (!context) return;
 
     context->accept_stop_flag = 1;
 
@@ -50,45 +55,77 @@ void hellow_stop(hellow_ctx* context) {
 
     pthread_join(context->accept_thread_id, NULL);
 
-    // Free paths for routes
+    if (context->type == HELLOW_TYPE_UNIX && context->unix_path) {
+        unlink(context->unix_path);
+        free(context->unix_path);
+    }
+
     for (size_t i = 0; i < context->route_count; i++) free(context->routes[i].path);
 
     free(context->default_root);
-
     free(context->routes);
-
     free(context);
 }
 
-hellow_ctx* hellow_init(uint16_t port) {
-    hellow_ctx* context   = (hellow_ctx*)calloc(1, sizeof(hellow_ctx));
-    context->port         = port;
-    context->default_root = NULL;
+hellow_ctx* hellow_init_tcp(uint16_t port) {
+    hellow_ctx* context = (hellow_ctx*)calloc(1, sizeof(hellow_ctx));
+    if (!context) return NULL;
 
-    // Create socket
+    context->type = HELLOW_TYPE_TCP;
+    context->port = port;
+
     context->server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (context->server_fd == 0) {
-        hellow_stop(context);
+    if (context->server_fd < 0) {
+        free(context);
         return NULL;
     }
 
-    // Set to socket to non blocking
     int flags = fcntl(context->server_fd, F_GETFL, 0);
     fcntl(context->server_fd, F_SETFL, flags | O_NONBLOCK);
 
     int opt = 1;
-    if (setsockopt(context->server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-        hellow_stop(context);
+    setsockopt(context->server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    context->address.sin_family = AF_INET;
+    context->address.sin_addr.s_addr = INADDR_ANY;
+    context->address.sin_port = htons(port);
+
+    if (bind(context->server_fd, (struct sockaddr*)&context->address, sizeof(context->address)) < 0) {
+        close(context->server_fd);
+        free(context);
         return NULL;
     }
 
-    // Bind to port
-    context->address.sin_family      = AF_INET;
-    context->address.sin_addr.s_addr = INADDR_ANY;
-    context->address.sin_port        = htons(port);
-    if (bind(context->server_fd, (struct sockaddr*)&context->address, sizeof(context->address)) <
-        0) {
-        hellow_stop(context);
+    return context;
+}
+
+hellow_ctx* hellow_init_unix(const char* path) {
+    hellow_ctx* context = (hellow_ctx*)calloc(1, sizeof(hellow_ctx));
+    if (!context) return NULL;
+
+    context->type = HELLOW_TYPE_UNIX;
+    context->unix_path = strdup(path);
+
+    context->server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (context->server_fd < 0) {
+        free(context->unix_path);
+        free(context);
+        return NULL;
+    }
+
+    int flags = fcntl(context->server_fd, F_GETFL, 0);
+    fcntl(context->server_fd, F_SETFL, flags | O_NONBLOCK);
+
+    unlink(path); // remove existing socket file
+
+    memset(&context->unix_address, 0, sizeof(struct sockaddr_un));
+    context->unix_address.sun_family = AF_UNIX;
+    strncpy(context->unix_address.sun_path, path, sizeof(context->unix_address.sun_path) - 1);
+
+    if (bind(context->server_fd, (struct sockaddr*)&context->unix_address, sizeof(context->unix_address)) < 0) {
+        close(context->server_fd);
+        free(context->unix_path);
+        free(context);
         return NULL;
     }
 

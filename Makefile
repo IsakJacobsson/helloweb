@@ -7,13 +7,13 @@ CC = gcc
 CFLAGS = -Wall -Wextra -O2
 
 # Source files
-SRCS = basic_helloweb_server.c helloweb.c
+SRCS = helloweb_server_port.c helloweb.c
 
 # Object files (replace .c with .o)
 OBJS = $(SRCS:.c=.o)
 
 # Executable name
-TARGET = basic_webserver
+TARGET = webserver
 
 # Default target
 all: $(TARGET)
