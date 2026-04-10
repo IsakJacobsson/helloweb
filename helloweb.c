@@ -156,6 +156,30 @@ int hellow_add_route(hellow_ctx* context,
     return 1;
 }
 
+ssize_t write_all(int fd, const void *buf, size_t len) {
+    size_t total = 0;
+    const char *p = buf;
+
+    while (total < len) {
+        ssize_t written = write(fd, p + total, len - total);
+
+        if (written < 0) {
+            if (errno == EINTR)
+                continue; // retry
+            return -1;   // real error
+        }
+
+        if (written == 0) {
+            // Shouldn't happen for write, but handle defensively
+            break;
+        }
+
+        total += written;
+    }
+
+    return total;
+}
+
 static int hellow_send_response(hellow_response* response, int client_fd) {
     char header[BUFFER_SIZE];
     char* status_text;
@@ -186,11 +210,15 @@ static int hellow_send_response(hellow_response* response, int client_fd) {
                                  response->content_type,
                                  response->body_length);
 
-    // Send the header first
-    write(client_fd, header, header_length);
+    // Send the header
+    if (write_all(client_fd, header, header_length) < 0) {
+        return 0;
+    }
 
-    // Then send the body separately
-    write(client_fd, response->body, response->body_length);
+    // Send the body
+    if (write_all(client_fd, response->body, response->body_length) < 0) {
+        return 0;
+    }
 
     return 1;
 }
