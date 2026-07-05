@@ -316,6 +316,24 @@ static void handle_request(hellow_ctx* context, client_conn* conn) {
                               .headers      = NULL,
                               .body         = NULL};
 
+    char *body_start = strstr(conn->buffer, "\r\n\r\n");
+    if (body_start) {
+        body_start += 4; // skip "\r\n\r\n"
+    }
+
+    int content_length = 0;
+
+    char *cl = strstr(conn->buffer, "Content-Length:");
+    if (cl) {
+        sscanf(cl, "Content-Length: %d", &content_length);
+    }
+
+    if (body_start && content_length > 0) {
+        request.body = malloc(content_length + 1);
+        memcpy(request.body, body_start, content_length);
+        request.body[content_length] = '\0';
+    }
+
     hellow_response response = {.status_code  = 0,
                                 .content_type = NULL,
                                 .body         = NULL,
