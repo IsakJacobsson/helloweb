@@ -2,7 +2,7 @@ CC = gcc
 
 CFLAGS = -Wall -Wextra -O2 -I../include
 
-LIB = ../build/libhelloweb.a
+LIB = ../lib/libhelloweb.a
 
 TARGET = server_app
 

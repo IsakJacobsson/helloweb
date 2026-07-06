@@ -11,7 +11,7 @@ make
 This builds the static library
 
 ```txt
-build/libhelloweb.a
+lib/libhelloweb.a
 ```
 
 ## Build example
