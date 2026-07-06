@@ -13,17 +13,3 @@ This builds the static library
 ```txt
 lib/libhelloweb.a
 ```
-
-## Build example
-
-After building the library:
-
-```bash
-cd examples
-make
-```
-
-This builds the example binary
-
-```txt
-examples/server_app

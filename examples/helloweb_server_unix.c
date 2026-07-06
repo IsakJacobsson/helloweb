@@ -61,7 +61,7 @@ int main(void) {
         return EXIT_FAILURE;
     }
 
-    hellow_set_default_root(context, "./react/dist");
+    hellow_set_default_root(context, "./html");
 
     example_data* data = malloc(sizeof(example_data));
     if (!data) {

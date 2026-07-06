@@ -56,7 +56,7 @@ void api_example_callback(hellow_response_context* response_ctx, void* user_data
 int main(void) {
     context = hellow_init_tcp(PORT);
 
-    hellow_set_default_root(context, "./react/dist");
+    hellow_set_default_root(context, "./html");
 
     example_data* data = malloc(sizeof(example_data));
     if (!data) {

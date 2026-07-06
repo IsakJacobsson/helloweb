@@ -2,6 +2,7 @@
 # C build artifacts
 # =========================
 build/
+lib/
 *.o
 *.a
 *.so
@@ -10,28 +11,11 @@ build/
 server_app
 
 # =========================
-# React / Node
-# =========================
-react/node_modules/
-react/build/
-react/dist/
-
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# =========================
 # Docker / misc
 # =========================
 *.log
 
 # optional: local dev env files
 .env
-
-# =========================
-# IDE / editor
-# =========================
-.vscode/
-.idea/
 
 .DS_Store

@@ -1,32 +1,26 @@
 CC = gcc
+INCLUDES = -I../include
 
-CFLAGS = -Wall -Wextra -O2 -I../include
+CFLAGS = -Wall -Wextra -O2 $(INCLUDES)
 
-LIB = ../lib/libhelloweb.a
+SRCS = helloweb_server_port.c
+OBJS = $(SRCS:.c=.o)
 
 TARGET = server_app
 
-SRCS = helloweb_server_port.c
+LDFLAGS = -L../lib
+LDLIBS = -lhelloweb
 
-.PHONY: all clean react
+.PHONY: all clean libhelloweb
 
-all: react $(TARGET)
+all: libhelloweb $(TARGET)
 
-$(TARGET): $(SRCS) $(LIB)
-	$(CC) $(CFLAGS) -o $@ $(SRCS) $(LIB)
+libhelloweb:
+	$(MAKE) -C ..
+
+$(TARGET): $(SRCS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 clean:
 	rm -f $(TARGET)
-
-# ------------------------
-# React build via Docker
-# ------------------------
-
-REACT_DIR = react
-
-react:
-	docker run --rm \
-		-v $(PWD)/$(REACT_DIR):/app \
-		-w /app \
-		node:20 \
-		sh -c "npm install && npm run build"
+	$(MAKE) -C .. clean
