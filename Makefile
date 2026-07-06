@@ -1,31 +1,29 @@
-# Makefile for your C project
-
-# Compiler
 CC = gcc
+AR = ar
 
-# Compiler flags
-CFLAGS = -Wall -Wextra -O2
+CFLAGS = -Wall -Wextra -O2 -Iinclude
 
-# Source files
-SRCS = helloweb_server_port.c helloweb.c
+LIB_NAME = libhelloweb.a
+LIB_DIR = build
+LIB = $(LIB_DIR)/$(LIB_NAME)
 
-# Object files (replace .c with .o)
+SRCS = src/helloweb.c
 OBJS = $(SRCS:.c=.o)
 
-# Executable name
-TARGET = webserver
 
-# Default target
-all: $(TARGET)
+.PHONY: all lib clean
 
-# Link object files into executable
-$(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
+all: lib
 
-# Compile .c files into .o files
+lib: $(LIB)
+
+$(LIB): $(OBJS)
+	mkdir -p $(LIB_DIR)
+	$(AR) rcs $@ $^
+
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Clean build files
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(OBJS)
+	rm -rf $(LIB_DIR)
