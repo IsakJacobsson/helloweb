@@ -11,7 +11,7 @@ SRCS = src/helloweb.c
 OBJS = $(SRCS:.c=.o)
 
 
-.PHONY: all lib clean
+.PHONY: all clean
 
 all: $(LIB)
 
