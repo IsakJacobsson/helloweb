@@ -420,6 +420,9 @@ static void handle_request(hellow_ctx* context, client_conn* conn) {
 cleanup:
     free(request.method);
     free(request.path);
+    free(request.query_string);
+    free(request.headers);
+    free(request.body);
     free(response_context.response->content_type);
     free(response_context.response->body);
 }

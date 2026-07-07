@@ -61,6 +61,7 @@ int main(void) {
     example_data* data = malloc(sizeof(example_data));
     if (!data) {
         fprintf(stderr, "Failed to allocate memory for example_data\n");
+        hellow_stop(context);
         return EXIT_FAILURE;
     }
     data->request_count = 0;
@@ -77,6 +78,8 @@ int main(void) {
     (void)getchar();
 
     hellow_stop(context);
+
+    free(data);
 
     printf("Server stopped\n");
 

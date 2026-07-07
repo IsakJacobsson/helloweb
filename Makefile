@@ -19,9 +19,6 @@ $(LIB): $(OBJS)
 	mkdir -p $(LIB_DIR)
 	$(AR) rcs $@ $^
 
-# %.o: %.c
-#	$(CC) $(CFLAGS) -c $< -o $@
-
 clean:
 	rm -f $(OBJS)
 	rm -rf $(LIB_DIR)

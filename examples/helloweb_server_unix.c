@@ -88,6 +88,8 @@ int main(void) {
 
     hellow_stop(context);
 
+    free(data);
+
     printf("Server stopped\n");
 
     return 0;

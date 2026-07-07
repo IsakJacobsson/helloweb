@@ -9,7 +9,7 @@ OBJS = $(SRCS:.c=.o)
 TARGET = server_app
 
 LDFLAGS = -L../lib
-LDLIBS = -lhelloweb
+LDLIBS = -lhelloweb -pthread
 
 .PHONY: all clean libhelloweb
 
